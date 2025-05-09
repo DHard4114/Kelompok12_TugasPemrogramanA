@@ -1,1 +1,1 @@
-"# Kelompok12_TugasPemrogramanA" 
+# Kelompok12_TugasPemrogramanA
