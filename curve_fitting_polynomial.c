@@ -10,118 +10,15 @@ typedef struct {
     int is_interpolated;
 } DataPoint;
 
-DataPoint* read_csv(const char* filename, int* count) {
-    FILE* file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening file");
-        exit(1);
-    }
-
-    char line[1024];
-    fgets(line, sizeof(line), file);
-
-    DataPoint* data = malloc(sizeof(DataPoint) * 100);
-    int capacity = 100;
-    int n = 0;
-
-    while (fgets(line, sizeof(line), file)) {
-        int year;
-        double percentage;
-        long long population;
-
-        if (sscanf(line, "%d,%lf,%lld", &year, &percentage, &population) == 3) {
-            if (n >= capacity) {
-                capacity *= 2;
-                data = realloc(data, sizeof(DataPoint) * capacity);
-            }
-            data[n].year = year;
-            data[n].percentage = percentage;
-            data[n].population = population;
-            data[n].is_interpolated = 0;
-            n++;
-        }
-    }
-
-    fclose(file);
-    *count = n;
-    return data;
-}
-
-int compare_years(const void* a, const void* b) {
-    DataPoint* da = (DataPoint*)a;
-    DataPoint* db = (DataPoint*)b;
-    return da->year - db->year;
-}
-
 typedef struct {
     double a, b, c, d;
 } CubicCoefficients;
 
-CubicCoefficients fit_cubic(int* years, double* y_values, int count) {
-    double sum_x = 0, sum_x2 = 0, sum_x3 = 0, sum_x4 = 0, sum_x5 = 0, sum_x6 = 0;
-    double sum_y = 0, sum_xy = 0, sum_x2y = 0, sum_x3y = 0;
-	int i;
-    for (i = 0; i < count; i++) {
-        int x = years[i] - 1960;
-        double y = y_values[i];
+CubicCoefficients fit_cubic(int* years, double* y_values, int count);
+DataPoint* read_csv(const char* filename, int* count);
+int compare_years(const void* a, const void* b);
 
-        double x2 = x * x;
-        double x3 = x2 * x;
-        double x4 = x3 * x;
-        double x5 = x4 * x;
-        double x6 = x5 * x;
 
-        sum_x += x;
-        sum_x2 += x2;
-        sum_x3 += x3;
-        sum_x4 += x4;
-        sum_x5 += x5;
-        sum_x6 += x6;
-
-        sum_y += y;
-        sum_xy += x * y;
-        sum_x2y += x2 * y;
-        sum_x3y += x3 * y;
-    }
-
-    double matrix[4][5] = {
-        {sum_x3, sum_x2, sum_x, count, sum_y},
-        {sum_x4, sum_x3, sum_x2, sum_x, sum_xy},
-        {sum_x5, sum_x4, sum_x3, sum_x2, sum_x2y},
-        {sum_x6, sum_x5, sum_x4, sum_x3, sum_x3y}
-    };
-    
-    for (i = 0; i < 4; i++) {
-    	int k;
-        int max_row = i;
-        for (k = i + 1; k < 4; k++) {
-            if (fabs(matrix[k][i]) > fabs(matrix[max_row][i])) {
-                max_row = k;
-            }
-        }
-
-        for (k = i; k < 5; k++) {
-            double temp = matrix[i][k];
-            matrix[i][k] = matrix[max_row][k];
-            matrix[max_row][k] = temp;
-        }
-		int j;
-        for (k = i + 1; k < 4; k++) {
-            double factor = matrix[k][i] / matrix[i][i];
-            for (j = i; j < 5; j++) {
-                matrix[k][j] -= factor * matrix[i][j];
-            }
-        }
-    }
-
-    CubicCoefficients coeffs;
-    coeffs.d = matrix[3][4] / matrix[3][3];
-    coeffs.c = (matrix[2][4] - matrix[2][3] * coeffs.d) / matrix[2][2];
-    coeffs.b = (matrix[1][4] - matrix[1][3] * coeffs.d - matrix[1][2] * coeffs.c) / matrix[1][1];
-    coeffs.a = (matrix[0][4] - matrix[0][3] * coeffs.d - matrix[0][2] * coeffs.c - matrix[0][1] * coeffs.b) / matrix[0][0];
-
-    return coeffs;
-}
 
 int main() {
     int n;
@@ -219,3 +116,114 @@ int main() {
 
     return 0;
 }
+
+DataPoint* read_csv(const char* filename, int* count) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    char line[1024];
+    fgets(line, sizeof(line), file);
+
+    DataPoint* data = malloc(sizeof(DataPoint) * 100);
+    int capacity = 100;
+    int n = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        int year;
+        double percentage;
+        long long population;
+
+        if (sscanf(line, "%d,%lf,%lld", &year, &percentage, &population) == 3) {
+            if (n >= capacity) {
+                capacity *= 2;
+                data = realloc(data, sizeof(DataPoint) * capacity);
+            }
+            data[n].year = year;
+            data[n].percentage = percentage;
+            data[n].population = population;
+            data[n].is_interpolated = 0;
+            n++;
+        }
+    }
+
+    fclose(file);
+    *count = n;
+    return data;
+}
+
+CubicCoefficients fit_cubic(int* years, double* y_values, int count) {
+    double sum_x = 0, sum_x2 = 0, sum_x3 = 0, sum_x4 = 0, sum_x5 = 0, sum_x6 = 0;
+    double sum_y = 0, sum_xy = 0, sum_x2y = 0, sum_x3y = 0;
+	int i;
+    for (i = 0; i < count; i++) {
+        int x = years[i] - 1960;
+        double y = y_values[i];
+
+        double x2 = x * x;
+        double x3 = x2 * x;
+        double x4 = x3 * x;
+        double x5 = x4 * x;
+        double x6 = x5 * x;
+
+        sum_x += x;
+        sum_x2 += x2;
+        sum_x3 += x3;
+        sum_x4 += x4;
+        sum_x5 += x5;
+        sum_x6 += x6;
+
+        sum_y += y;
+        sum_xy += x * y;
+        sum_x2y += x2 * y;
+        sum_x3y += x3 * y;
+    }
+
+    double matrix[4][5] = {
+        {sum_x3, sum_x2, sum_x, count, sum_y},
+        {sum_x4, sum_x3, sum_x2, sum_x, sum_xy},
+        {sum_x5, sum_x4, sum_x3, sum_x2, sum_x2y},
+        {sum_x6, sum_x5, sum_x4, sum_x3, sum_x3y}
+    };
+    
+    for (i = 0; i < 4; i++) {
+    	int k;
+        int max_row = i;
+        for (k = i + 1; k < 4; k++) {
+            if (fabs(matrix[k][i]) > fabs(matrix[max_row][i])) {
+                max_row = k;
+            }
+        }
+
+        for (k = i; k < 5; k++) {
+            double temp = matrix[i][k];
+            matrix[i][k] = matrix[max_row][k];
+            matrix[max_row][k] = temp;
+        }
+		int j;
+        for (k = i + 1; k < 4; k++) {
+            double factor = matrix[k][i] / matrix[i][i];
+            for (j = i; j < 5; j++) {
+                matrix[k][j] -= factor * matrix[i][j];
+            }
+        }
+    }
+
+    CubicCoefficients coeffs;
+    coeffs.d = matrix[3][4] / matrix[3][3];
+    coeffs.c = (matrix[2][4] - matrix[2][3] * coeffs.d) / matrix[2][2];
+    coeffs.b = (matrix[1][4] - matrix[1][3] * coeffs.d - matrix[1][2] * coeffs.c) / matrix[1][1];
+    coeffs.a = (matrix[0][4] - matrix[0][3] * coeffs.d - matrix[0][2] * coeffs.c - matrix[0][1] * coeffs.b) / matrix[0][0];
+
+    return coeffs;
+}
+
+int compare_years(const void* a, const void* b) {
+    DataPoint* da = (DataPoint*)a;
+    DataPoint* db = (DataPoint*)b;
+    return da->year - db->year;
+}
+
+
